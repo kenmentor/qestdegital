@@ -1,39 +1,56 @@
-'use client';
+"use client";
 
 // ============================================================
 // Imports
 // ============================================================
 
-import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Globe, Subtitles, Radio, ChevronDown, Loader2, XCircle, Wifi, ArrowLeft, Users, Volume2 } from 'lucide-react';
-import { ConnectionState, RemoteAudioTrack, Room, DisconnectReason } from 'livekit-client';
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Globe,
+  Subtitles,
+  Radio,
+  ChevronDown,
+  Loader2,
+  XCircle,
+  Wifi,
+  ArrowLeft,
+  Users,
+  Volume2,
+  Music,
+} from "lucide-react";
+import {
+  ConnectionState,
+  RemoteAudioTrack,
+  Room,
+  DisconnectReason,
+} from "livekit-client";
 
 // ============================================================
 // Constants & Types
 // ============================================================
 
 const LANGUAGES: { code: string; name: string; flag: string }[] = [
-  { code: 'original', name: 'Original', flag: '🎙' },
-  { code: 'es', name: 'Spanish', flag: '🇪🇸' },
-  { code: 'fr', name: 'French', flag: '🇫🇷' },
-  { code: 'zh', name: 'Chinese', flag: '🇨🇳' },
-  { code: 'de', name: 'German', flag: '🇩🇪' },
-  { code: 'ja', name: 'Japanese', flag: '🇯🇵' },
-  { code: 'ko', name: 'Korean', flag: '🇰🇷' },
+  { code: "original", name: "Original", flag: "🎙" },
+  { code: "es", name: "Spanish", flag: "🇪🇸" },
+  { code: "fr", name: "French", flag: "🇫🇷" },
+  { code: "zh", name: "Chinese", flag: "🇨🇳" },
+  { code: "de", name: "German", flag: "🇩🇪" },
+  { code: "ja", name: "Japanese", flag: "🇯🇵" },
+  { code: "ko", name: "Korean", flag: "🇰🇷" },
 ];
 
 const ROOM_LIST = [
-  { code: 'english-room', name: 'English', flag: '🇬🇧' },
-  { code: 'french-room', name: 'French', flag: '🇫🇷' },
-  { code: 'german-room', name: 'German', flag: '🇩🇪' },
+  { code: "english-room", name: "English", flag: "🇬🇧" },
+  { code: "french-room", name: "French", flag: "🇫🇷" },
+  { code: "german-room", name: "German", flag: "🇩🇪" },
 ];
 
 const ROOM_NAMES: Record<string, string> = {
-  'english-room': 'English',
-  'french-room': 'French',
-  'german-room': 'German',
+  "english-room": "English",
+  "french-room": "French",
+  "german-room": "German",
 };
 
 interface Participant {
@@ -49,11 +66,12 @@ interface Participant {
 
 /** Generate or retrieve a persistent tab identifier */
 function getTabId(): string {
-  if (typeof window === 'undefined') return Math.random().toString(36).substring(2, 15);
-  let tabId = sessionStorage.getItem('tab_id');
+  if (typeof window === "undefined")
+    return Math.random().toString(36).substring(2, 15);
+  let tabId = sessionStorage.getItem("tab_id");
   if (!tabId) {
     tabId = Math.random().toString(36).substring(2, 15);
-    sessionStorage.setItem('tab_id', tabId);
+    sessionStorage.setItem("tab_id", tabId);
   }
   return tabId;
 }
@@ -61,7 +79,7 @@ function getTabId(): string {
 /** Request a wake lock to prevent screen from sleeping */
 async function requestWakeLock() {
   try {
-    await navigator.wakeLock.request('screen');
+    await navigator.wakeLock.request("screen");
   } catch {
     // Wake lock not supported or denied
   }
@@ -71,10 +89,13 @@ async function requestWakeLock() {
 function cleanupAudioResources(refs: {
   audioRef: React.MutableRefObject<HTMLAudioElement | null>;
   keepAliveRef: React.MutableRefObject<HTMLAudioElement | null>;
-  keepPlayingIntervalRef: React.MutableRefObject<ReturnType<typeof setInterval> | null>;
+  keepPlayingIntervalRef: React.MutableRefObject<ReturnType<
+    typeof setInterval
+  > | null>;
   audioContextRef: React.MutableRefObject<AudioContext | null>;
 }) {
-  const { audioRef, keepAliveRef, keepPlayingIntervalRef, audioContextRef } = refs;
+  const { audioRef, keepAliveRef, keepPlayingIntervalRef, audioContextRef } =
+    refs;
 
   if (audioRef.current) {
     audioRef.current.pause();
@@ -93,7 +114,7 @@ function cleanupAudioResources(refs: {
     keepPlayingIntervalRef.current = null;
   }
 
-  if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+  if (audioContextRef.current && audioContextRef.current.state !== "closed") {
     audioContextRef.current.close();
     audioContextRef.current = null;
   }
@@ -104,30 +125,38 @@ function cleanupAudioResources(refs: {
 // ============================================================
 
 /** Name entry screen shown before joining the meeting */
-function NameEntry({ roomCode, onSubmit, isConfigLoading }: {
+function NameEntry({
+  roomCode,
+  onSubmit,
+  isConfigLoading,
+}: {
   roomCode: string;
   onSubmit: (name: string) => void;
   isConfigLoading: boolean;
 }) {
   const [name, setName] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('userName') || '';
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("userName") || "";
     }
-    return '';
+    return "";
   });
-  const roomDisplayName = ROOM_NAMES[roomCode] || roomCode.replace('-room', '');
+
+  const roomDisplayName = ROOM_NAMES[roomCode] || roomCode.replace("-room", "");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim()) {
-      localStorage.setItem('userName', name.trim());
+      localStorage.setItem("userName", name.trim());
       onSubmit(name.trim());
     }
   };
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center p-4 sm:p-6">
-      <button onClick={() => window.location.href = '/'} className="absolute top-4 left-4 p-2 text-gray-500 hover:text-white transition-colors z-10">
+      <button
+        onClick={() => (window.location.href = "/")}
+        className="absolute top-4 left-4 p-2 text-gray-500 hover:text-white transition-colors z-10"
+      >
         <ArrowLeft className="w-5 h-5" />
       </button>
 
@@ -136,7 +165,9 @@ function NameEntry({ roomCode, onSubmit, isConfigLoading }: {
           <div className="w-14 h-14 sm:w-16 sm:h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Globe className="w-7 h-7 sm:w-8 sm:h-8 text-black" />
           </div>
-          <h2 className="text-xl sm:text-2xl font-semibold text-white mb-2">{roomDisplayName} Room</h2>
+          <h2 className="text-xl sm:text-2xl font-semibold text-white mb-2">
+            {roomDisplayName} Room
+          </h2>
           <p className="text-gray-500 text-sm">Enter your name to join</p>
         </div>
 
@@ -155,7 +186,7 @@ function NameEntry({ roomCode, onSubmit, isConfigLoading }: {
             disabled={!name.trim() || isConfigLoading}
             className="w-full py-3 sm:py-4 bg-white text-black rounded-xl font-medium text-base sm:text-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 transition-colors"
           >
-            {isConfigLoading ? 'Connecting...' : 'Join Room'}
+            {isConfigLoading ? "Connecting..." : "Join Room"}
           </button>
         </form>
       </div>
@@ -164,7 +195,12 @@ function NameEntry({ roomCode, onSubmit, isConfigLoading }: {
 }
 
 /** Dropdown for switching between rooms and languages */
-function LanguageSelector({ selectedLanguage, onChange, onRoomChange, currentRoom }: {
+function LanguageSelector({
+  selectedLanguage,
+  onChange,
+  onRoomChange,
+  currentRoom,
+}: {
   selectedLanguage: string;
   onChange: (lang: string) => void;
   onRoomChange: (newRoom: string) => void;
@@ -172,16 +208,20 @@ function LanguageSelector({ selectedLanguage, onChange, onRoomChange, currentRoo
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const [activeTab, setActiveTab] = useState<'language' | 'room'>('room');
+  const [activeTab, setActiveTab] = useState<"language" | "room">("room");
 
-  const currentRoomData = ROOM_LIST.find(r => r.code === currentRoom);
+  const currentRoomData = ROOM_LIST.find((r) => r.code === currentRoom);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setIsOpen(false);
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      )
+        setIsOpen(false);
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   return (
@@ -191,9 +231,13 @@ function LanguageSelector({ selectedLanguage, onChange, onRoomChange, currentRoo
         className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 bg-[#1a1a1a] hover:bg-[#252525] rounded-xl transition-colors text-white"
       >
         <Globe className="w-4 h-4" />
-        <span className="text-sm hidden sm:inline">{currentRoomData?.flag} {currentRoomData?.name}</span>
+        <span className="text-sm hidden sm:inline">
+          {currentRoomData?.flag} {currentRoomData?.name}
+        </span>
         <span className="text-sm sm:hidden">{currentRoomData?.flag}</span>
-        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown
+          className={`w-4 h-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
+        />
       </button>
 
       <AnimatePresence>
@@ -206,48 +250,60 @@ function LanguageSelector({ selectedLanguage, onChange, onRoomChange, currentRoo
           >
             <div className="flex">
               <button
-                onClick={() => setActiveTab('room')}
-                className={`flex-1 py-2.5 text-sm font-medium transition-colors ${activeTab === 'room' ? 'text-white bg-[#252525]' : 'text-gray-400 hover:text-white'}`}
+                onClick={() => setActiveTab("room")}
+                className={`flex-1 py-2.5 text-sm font-medium transition-colors ${activeTab === "room" ? "text-white bg-[#252525]" : "text-gray-400 hover:text-white"}`}
               >
                 Room
               </button>
               <button
-                onClick={() => setActiveTab('language')}
-                className={`flex-1 py-2.5 text-sm font-medium transition-colors ${activeTab === 'language' ? 'text-white bg-[#252525]' : 'text-gray-400 hover:text-white'}`}
+                onClick={() => setActiveTab("language")}
+                className={`flex-1 py-2.5 text-sm font-medium transition-colors ${activeTab === "language" ? "text-white bg-[#252525]" : "text-gray-400 hover:text-white"}`}
               >
                 Language
               </button>
             </div>
 
             <div className="p-2 max-h-64 overflow-y-auto">
-              {activeTab === 'room' ? (
-                ROOM_LIST.map((room) => (
-                  <button
-                    key={room.code}
-                    onClick={() => { onRoomChange(room.code); setIsOpen(false); }}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                      currentRoom === room.code ? 'bg-white text-black' : 'text-white hover:bg-[#252525]'
-                    }`}
-                  >
-                    <span className="text-lg sm:text-xl">{room.flag}</span>
-                    <span className="text-sm font-medium">{room.name} Room</span>
-                    {currentRoom === room.code && <Volume2 className="w-4 h-4 ml-auto" />}
-                  </button>
-                ))
-              ) : (
-                LANGUAGES.map((lang) => (
-                  <button
-                    key={lang.code}
-                    onClick={() => { onChange(lang.code); setIsOpen(false); }}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                      selectedLanguage === lang.code ? 'bg-white text-black' : 'text-white hover:bg-[#252525]'
-                    }`}
-                  >
-                    <span className="text-lg sm:text-xl">{lang.flag}</span>
-                    <span className="text-sm">{lang.name}</span>
-                  </button>
-                ))
-              )}
+              {activeTab === "room"
+                ? ROOM_LIST.map((room) => (
+                    <button
+                      key={room.code}
+                      onClick={() => {
+                        onRoomChange(room.code);
+                        setIsOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                        currentRoom === room.code
+                          ? "bg-white text-black"
+                          : "text-white hover:bg-[#252525]"
+                      }`}
+                    >
+                      <span className="text-lg sm:text-xl">{room.flag}</span>
+                      <span className="text-sm font-medium">
+                        {room.name} Room
+                      </span>
+                      {currentRoom === room.code && (
+                        <Volume2 className="w-4 h-4 ml-auto" />
+                      )}
+                    </button>
+                  ))
+                : LANGUAGES.map((lang) => (
+                    <button
+                      key={lang.code}
+                      onClick={() => {
+                        onChange(lang.code);
+                        setIsOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                        selectedLanguage === lang.code
+                          ? "bg-white text-black"
+                          : "text-white hover:bg-[#252525]"
+                      }`}
+                    >
+                      <span className="text-lg sm:text-xl">{lang.flag}</span>
+                      <span className="text-sm">{lang.name}</span>
+                    </button>
+                  ))}
             </div>
           </motion.div>
         )}
@@ -255,39 +311,61 @@ function LanguageSelector({ selectedLanguage, onChange, onRoomChange, currentRoo
     </div>
   );
 }
-
 /** Main speaker tile showing the current user and connection status */
-function SpeakerTile({ userName, connectionState, selectedLanguage }: {
+function SpeakerTile({
+  userName,
+  connectionState,
+  selectedLanguage,
+}: {
   userName: string;
   connectionState: ConnectionState;
   selectedLanguage: string;
 }) {
-  const selectedLang = LANGUAGES.find(l => l.code === selectedLanguage);
+  const selectedLang = LANGUAGES.find((l) => l.code === selectedLanguage);
   const isConnected = connectionState === ConnectionState.Connected;
 
   return (
     <div className="w-full max-w-xs sm:max-w-sm md:max-w-md pt-8">
       <div className="bg-[#1a1a1a] rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-10 aspect-square flex flex-col items-center justify-center relative overflow-hidden">
         <div className="absolute top-3 sm:top-4 right-3 sm:right-4">
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#0a0a0a] border ${isConnected ? 'border-green-500/30' : 'border-gray-700'}`}>
-            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`} />
-            <span className="text-xs text-gray-400">{isConnected ? 'LIVE' : 'CONNECTING'}</span>
+          <div
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#0a0a0a] border ${isConnected ? "border-green-500/30" : "border-gray-700"}`}
+          >
+            <div
+              className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500 animate-pulse" : "bg-gray-500"}`}
+            />
+            <span className="text-xs text-gray-400">
+              {isConnected ? "LIVE" : "CONNECTING"}
+            </span>
           </div>
         </div>
 
         <div className="relative mb-4 sm:mb-6">
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className={`w-20 sm:w-24 md:w-28 h-[40px] rounded-full ${isConnected ? 'bg-green-500/10' : 'bg-gray-500/10'} ${isConnected ? 'animate-pulse' : ''}`} />
+            <div
+              className={`w-20 sm:w-24 md:w-28 h-[40px] rounded-full ${isConnected ? "bg-green-500/10" : "bg-gray-500/10"} ${isConnected ? "animate-pulse" : ""}`}
+            />
           </div>
-          <div className={`relative w-16 sm:w-20 md:w-24 h-16 sm:h-20 md:h-24 bg-[#252525] rounded-full flex items-center justify-center ${isConnected ? 'animate-pulse' : ''}`}>
+          <div
+            className={`relative w-16 sm:w-20 md:w-24 h-16 sm:h-20 md:h-24 bg-[#252525] rounded-full flex items-center justify-center ${isConnected ? "animate-pulse" : ""}`}
+          >
             <span className="text-3xl sm:text-4xl md:text-5xl font-medium text-white">
-              {userName ? userName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : '?'}
+              {userName
+                ? userName
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase()
+                : "?"}
             </span>
           </div>
         </div>
 
         <div className="text-center">
-          <p className="text-white font-medium text-lg sm:text-xl">{userName || 'You'}</p>
+          <p className="text-white font-medium text-lg sm:text-xl">
+            {userName || "You"}
+          </p>
           <div className="flex items-center justify-center gap-2 mt-2">
             <Globe className="w-4 h-4 text-gray-500" />
             <p className="text-gray-500 text-sm"> {selectedLang?.name}</p>
@@ -318,11 +396,42 @@ function ControlBar({
   participantCount: number;
   currentRoom: string;
 }) {
+  const [playingMusic, setPlayingMusic] = useState(false);
+const audioRef = useRef<HTMLAudioElement | null>(null)
+useEffect(()=>{
+  audioRef.current =  new Audio("/musics/audio1.mp3");
+  audioRef.current.volume = 0.2
+  audioRef.current.loop = true 
+
+
+
+  return  ()=>{
+    if (audioRef.current){
+      audioRef.current.pause()
+      audioRef.current.volume = 0 ;
+      audioRef.current = null ;
+    }
+  }
+}
+
+,[])
+
+  function playMusic() {
+    setPlayingMusic((prev) => !prev);
+    if (playingMusic && audioRef.current) {
+      audioRef.current.pause();
+    }
+    if (!playingMusic && audioRef.current) {
+      audioRef.current.play();
+    }
+  }
   return (
     <div className="fixed bottom-3 sm:bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-2 sm:gap-3 bg-[#1a1a1a] px-3 py-2.5 sm:px-4 sm:py-3 rounded-xl sm:rounded-2xl shadow-lg z-50 sm:w-auto max-w-[calc(100vw-2rem)]">
       <div className="flex items-center gap-2 px-2.5 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full">
         <Radio className="w-3 h-3 text-green-500 animate-pulse flex-shrink-0" />
-        <span className="text-white text-xs sm:text-sm whitespace-nowrap">{participantCount}</span>
+        <span className="text-white text-xs sm:text-sm whitespace-nowrap">
+          {participantCount}
+        </span>
       </div>
 
       <div className="w-px h-5 sm:h-6 bg-[#333] flex-shrink-0" />
@@ -338,11 +447,16 @@ function ControlBar({
 
       <button
         onClick={onToggleCaptions}
-        className={`p-2 rounded-lg transition-colors flex-shrink-0 ${isCaptionsEnabled ? 'bg-white text-black' : 'hover:bg-[#252525] text-white'}`}
+        className={`p-2 rounded-lg transition-colors flex-shrink-0 ${isCaptionsEnabled ? "bg-white text-black" : "hover:bg-[#252525] text-white"}`}
       >
         <Subtitles className="w-4 sm:w-5 h-4 sm:h-5" />
       </button>
-
+      <button
+        onClick={playMusic}
+        className={`px-3 sm:px-4 py-2 ${playingMusic ? "bg-transparent hover:bg-yellow-500/10  " : "text-yellow-400 bg-yellow-500/40 hover:bg-yellow-500/20 "} rounded-lg text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0`}
+      >
+        <Music className="size-4" />
+      </button>
       <button
         onClick={onLeave}
         className="px-3 sm:px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0"
@@ -368,7 +482,9 @@ function CaptionOverlay({ isCaptionsEnabled }: { isCaptionsEnabled: boolean }) {
             <Subtitles className="w-3 sm:w-4 h-3 sm:h-4 text-gray-500" />
             <span className="text-gray-500 text-xs">Live</span>
           </div>
-          <p className="text-white text-sm sm:text-base text-center">Hello everyone, welcome to the conference.</p>
+          <p className="text-white text-sm sm:text-base text-center">
+            Hello everyone, welcome to the conference.
+          </p>
         </motion.div>
       )}
     </AnimatePresence>
@@ -381,10 +497,12 @@ function ConnectingOverlay({ isReconnecting }: { isReconnecting: boolean }) {
     <div className="fixed inset-0 bg-[#0a0a0a] flex flex-col items-center justify-center z-50 p-4">
       <Loader2 className="w-12 h-12 text-white animate-spin mb-4" />
       <h2 className="text-white text-xl font-medium mb-2">
-        {isReconnecting ? 'Reconnecting...' : 'Connecting...'}
+        {isReconnecting ? "Reconnecting..." : "Connecting..."}
       </h2>
       <p className="text-gray-500">
-        {isReconnecting ? 'Connection lost. Attempting to restore...' : 'Please wait'}
+        {isReconnecting
+          ? "Connection lost. Attempting to restore..."
+          : "Please wait"}
       </p>
     </div>
   );
@@ -400,14 +518,19 @@ export default function MeetingPage() {
   const roomCode = params.code as string;
 
   // ---- State ----
-  const [userName, setUserName] = useState<string>('');
+  const [userName, setUserName] = useState<string>("");
   const [isJoined, setIsJoined] = useState(false);
-  const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
+  const [connectionState, setConnectionState] = useState<ConnectionState>(
+    ConnectionState.Disconnected,
+  );
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [selectedLanguage, setSelectedLanguage] = useState('original');
+  const [selectedLanguage, setSelectedLanguage] = useState("original");
   const [isCaptionsEnabled, setIsCaptionsEnabled] = useState(false);
-  const [livekitConfig, setLivekitConfig] = useState<{ serverUrl: string; tokenEndpoint: string } | null>(null);
+  const [livekitConfig, setLivekitConfig] = useState<{
+    serverUrl: string;
+    tokenEndpoint: string;
+  } | null>(null);
   const [isConfigLoading, setIsConfigLoading] = useState(true);
   const [isMicOn, setIsMicOn] = useState(false);
 
@@ -416,7 +539,9 @@ export default function MeetingPage() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const keepAliveRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const keepPlayingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const keepPlayingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
   const participantsRef = useRef<Participant[]>([]);
   const isReconnectingRef = useRef(false);
 
@@ -433,13 +558,22 @@ export default function MeetingPage() {
 
   /** Initialize LiveKit server URL and token endpoint based on current host */
   useEffect(() => {
-    const protocol = typeof window !== 'undefined' ? window.location.protocol : 'http:';
-    const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-    const port = typeof window !== 'undefined' ? window.location.port : '3000';
-    const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || /^\d+\.\d+\.\d+\.\d+$/.test(hostname);
+    const protocol =
+      typeof window !== "undefined" ? window.location.protocol : "http:";
+    const hostname =
+      typeof window !== "undefined" ? window.location.hostname : "localhost";
+    const port = typeof window !== "undefined" ? window.location.port : "3000";
+    const isLocal =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      /^\d+\.\d+\.\d+\.\d+$/.test(hostname);
 
-    const serverUrl = isLocal ? `ws://${hostname}:7880` : `wss://${hostname}:7880`;
-    const baseUrl = isLocal ? `${protocol}//${hostname}:${port}` : `${protocol}//${hostname}`;
+    const serverUrl = isLocal
+      ? `ws://${hostname}:7880`
+      : `wss://${hostname}:7880`;
+    const baseUrl = isLocal
+      ? `${protocol}//${hostname}:${port}`
+      : `${protocol}//${hostname}`;
     const tokenEndpoint = `${baseUrl}/api/token`;
 
     setLivekitConfig({ serverUrl, tokenEndpoint });
@@ -456,7 +590,7 @@ export default function MeetingPage() {
     setIsJoined(false);
     setParticipants([]);
     setConnectionState(ConnectionState.Disconnected);
-    setUserName('');
+    setUserName("");
     setIsMicOn(false);
     isReconnectingRef.current = false;
 
@@ -467,7 +601,7 @@ export default function MeetingPage() {
       audioContextRef,
     });
 
-    if ('mediaSession' in navigator) {
+    if ("mediaSession" in navigator) {
       navigator.mediaSession.metadata = null;
     }
   }, [roomCode]);
@@ -477,173 +611,209 @@ export default function MeetingPage() {
   // ============================================================
 
   /** Connect to the LiveKit room with the given user name */
-  const connect = useCallback(async (name: string) => {
-    setUserName(name);
-    setIsJoined(true);
-    setConnectionState(ConnectionState.Connecting);
-    setError(null);
+  const connect = useCallback(
+    async (name: string) => {
+      setUserName(name);
+      setIsJoined(true);
+      setConnectionState(ConnectionState.Connecting);
+      setError(null);
 
-    if (!livekitConfig) {
-      setError('Configuration loading...');
-      setConnectionState(ConnectionState.Disconnected);
-      return;
-    }
+      if (!livekitConfig) {
+        setError("Configuration loading...");
+        setConnectionState(ConnectionState.Disconnected);
+        return;
+      }
 
-    try {
-      // Fetch participant token from API
-      const response = await fetch(livekitConfig.tokenEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identity: `${name}_${tabId}`, room: roomCode, name }),
-      });
-      if (!response.ok) throw new Error('Failed to get token');
+      try {
+        // Fetch participant token from API
+        const response = await fetch(livekitConfig.tokenEndpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            identity: `${name}_${tabId}`,
+            room: roomCode,
+            name,
+          }),
+        });
+        if (!response.ok) throw new Error("Failed to get token");
 
-      const { participantToken: token } = await response.json();
+        const { participantToken: token } = await response.json();
 
-      // Create and configure LiveKit room
-      const { Room } = await import('livekit-client');
-      const room = new Room({
-        adaptiveStream: true,
-        dynacast: true,
-      });
-      roomRef.current = room;
+        // Create and configure LiveKit room
+        const { Room } = await import("livekit-client");
+        const room = new Room({
+          adaptiveStream: true,
+          dynacast: true,
+        });
+        roomRef.current = room;
 
-      // ---- Event: Track subscribed (set up audio playback) ----
-      room.on('trackSubscribed', (track) => {
-        if (track instanceof RemoteAudioTrack) {
-          const audioElement = track.attach() as unknown as HTMLAudioElement & { playsInline?: boolean };
-          audioElement.autoplay = true;
-          if ('playsInline' in audioElement) {
-            audioElement.playsInline = true;
-          }
-          audioElement.crossOrigin = 'anonymous';
-
-          audioElement.play().then(() => {
-            audioElement.volume = 1;
-
-            try {
-              if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
-                audioContextRef.current = new AudioContext();
-              }
-              if (audioContextRef.current.state === 'suspended') {
-                audioContextRef.current.resume();
-              }
-              const source = audioContextRef.current.createMediaElementSource(audioElement);
-              source.connect(audioContextRef.current.destination);
-            } catch {
-              // AudioContext setup failed, fall back to element playback
+        // ---- Event: Track subscribed (set up audio playback) ----
+        room.on("trackSubscribed", (track) => {
+          if (track instanceof RemoteAudioTrack) {
+            const audioElement =
+              track.attach() as unknown as HTMLAudioElement & {
+                playsInline?: boolean;
+              };
+            audioElement.autoplay = true;
+            if ("playsInline" in audioElement) {
+              audioElement.playsInline = true;
             }
-          }).catch(() => {});
+            audioElement.crossOrigin = "anonymous";
 
-          document.body.appendChild(audioElement);
-          audioRef.current = audioElement;
+            audioElement
+              .play()
+              .then(() => {
+                audioElement.volume = 1;
 
-          // Keep audio playing when tab is hidden
-          const tryKeepPlaying = () => {
-            if (document.hidden && audioElement.paused) {
-              audioElement.play().catch(() => {});
+                try {
+                  if (
+                    !audioContextRef.current ||
+                    audioContextRef.current.state === "closed"
+                  ) {
+                    audioContextRef.current = new AudioContext();
+                  }
+                  if (audioContextRef.current.state === "suspended") {
+                    audioContextRef.current.resume();
+                  }
+                  const source =
+                    audioContextRef.current.createMediaElementSource(
+                      audioElement,
+                    );
+                  source.connect(audioContextRef.current.destination);
+                } catch {
+                  // AudioContext setup failed, fall back to element playback
+                }
+              })
+              .catch(() => {});
+
+            document.body.appendChild(audioElement);
+            audioRef.current = audioElement;
+
+            // Keep audio playing when tab is hidden
+            const tryKeepPlaying = () => {
+              if (document.hidden && audioElement.paused) {
+                audioElement.play().catch(() => {});
+              }
+            };
+
+            keepPlayingIntervalRef.current = setInterval(tryKeepPlaying, 1000);
+
+            // Update media session metadata
+            if ("mediaSession" in navigator) {
+              navigator.mediaSession.metadata = new MediaMetadata({
+                title: "Live Meeting",
+                artist:
+                  participantsRef.current.map((p) => p.name).join(", ") ||
+                  "Participants",
+                album: "LiveKit Audio",
+              });
             }
-          };
-
-          keepPlayingIntervalRef.current = setInterval(tryKeepPlaying, 1000);
-
-          // Update media session metadata
-          if ('mediaSession' in navigator) {
-            navigator.mediaSession.metadata = new MediaMetadata({
-              title: 'Live Meeting',
-              artist: participantsRef.current.map(p => p.name).join(', ') || 'Participants',
-              album: 'LiveKit Audio',
-            });
           }
-        }
-      });
-
-      // ---- Event: Participant joined ----
-      room.on('participantConnected', (p) => {
-        setParticipants(prev => [
-          ...prev,
-          { id: p.identity, name: p.name || 'User', isSpeaking: false, isMuted: true },
-        ]);
-      });
-
-      // ---- Event: Participant left ----
-      room.on('participantDisconnected', (p) => {
-        setParticipants(prev => prev.filter(participant => participant.id !== p.identity));
-      });
-
-      // ---- Event: Reconnecting (connection temporarily lost) ----
-      room.on('reconnecting', () => {
-        isReconnectingRef.current = true;
-        setConnectionState(ConnectionState.Reconnecting);
-      });
-
-      // ---- Event: Reconnected (connection restored after temporary loss) ----
-      room.on('reconnected', () => {
-        isReconnectingRef.current = false;
-        setConnectionState(ConnectionState.Connected);
-      });
-
-      // ---- Event: Room disconnected (cleanup and handle reconnect failure) ----
-      room.on('disconnected', (reason?: DisconnectReason) => {
-        isReconnectingRef.current = false;
-
-        // Clean up all resources
-        setParticipants([]);
-        cleanupAudioResources({
-          audioRef,
-          keepAliveRef,
-          keepPlayingIntervalRef,
-          audioContextRef,
         });
 
-        if ('mediaSession' in navigator) {
-          navigator.mediaSession.metadata = null;
-        }
+        // ---- Event: Participant joined ----
+        room.on("participantConnected", (p) => {
+          setParticipants((prev) => [
+            ...prev,
+            {
+              id: p.identity,
+              name: p.name || "User",
+              isSpeaking: false,
+              isMuted: true,
+            },
+          ]);
+        });
 
-        // Only show error for unexpected disconnects, not intentional leaves
-        const isIntentional =
-          reason === DisconnectReason.CLIENT_INITIATED ||
-          reason === DisconnectReason.USER_REJECTED;
+        // ---- Event: Participant left ----
+        room.on("participantDisconnected", (p) => {
+          setParticipants((prev) =>
+            prev.filter((participant) => participant.id !== p.identity),
+          );
+        });
 
-        if (roomRef.current === room) {
-          setConnectionState(ConnectionState.Disconnected);
-          if (!isIntentional) {
-            setError('Connection lost. Please rejoin the meeting.');
+        // ---- Event: Reconnecting (connection temporarily lost) ----
+        room.on("reconnecting", () => {
+          isReconnectingRef.current = true;
+          setConnectionState(ConnectionState.Reconnecting);
+        });
+
+        // ---- Event: Reconnected (connection restored after temporary loss) ----
+        room.on("reconnected", () => {
+          isReconnectingRef.current = false;
+          setConnectionState(ConnectionState.Connected);
+        });
+
+        // ---- Event: Room disconnected (cleanup and handle reconnect failure) ----
+        room.on("disconnected", (reason?: DisconnectReason) => {
+          isReconnectingRef.current = false;
+
+          // Clean up all resources
+          setParticipants([]);
+          cleanupAudioResources({
+            audioRef,
+            keepAliveRef,
+            keepPlayingIntervalRef,
+            audioContextRef,
+          });
+          if ("mediaSession" in navigator) {
+            navigator.mediaSession.metadata = null;
           }
-        }
-      });
 
-      // Connect to the LiveKit server
-      await room.connect(livekitConfig.serverUrl, token);
-      setConnectionState(ConnectionState.Connected);
+          // Only show error for unexpected disconnects, not intentional leaves
+          const isIntentional =
+            reason === DisconnectReason.CLIENT_INITIATED ||
+            reason === DisconnectReason.USER_REJECTED;
 
-      // Play silent keep-alive audio to keep media session active
-      const audio = new Audio('/keepalive.mp3');
-      audio.loop = true;
-      audio.volume = 0.0000001;
-      audio.play().catch(() => {});
-      keepAliveRef.current = audio;
+          if (roomRef.current === room) {
+            setConnectionState(ConnectionState.Disconnected);
+            if (!isIntentional) {
+              setError("Connection lost. Please rejoin the meeting.");
+            }
+          }
+        });
 
-      // Initialize participant list
-      const initialParticipants = [
-        { id: room.localParticipant.identity, name, isSpeaking: false, isMuted: false },
-      ];
-      room.remoteParticipants.forEach((p) => {
-        initialParticipants.push({ id: p.identity, name: p.name || 'User', isSpeaking: false, isMuted: true });
-      });
-      setParticipants(initialParticipants);
+        // Connect to the LiveKit server
+        await room.connect(livekitConfig.serverUrl, token);
+        setConnectionState(ConnectionState.Connected);
 
-      // Request wake lock to prevent screen sleep
-      requestWakeLock();
+        // Play silent keep-alive audio to keep media session active
+        const audio = new Audio("/keepalive.mp3");
+        audio.loop = true;
+        audio.volume = 0.0000001;
+        audio.play().catch(() => {});
+        keepAliveRef.current = audio;
 
-    } catch (err) {
-      console.error('Connection error:', err);
-      isReconnectingRef.current = false;
-      setError(err instanceof Error ? err.message : 'Connection failed');
-      setConnectionState(ConnectionState.Disconnected);
-    }
-  }, [livekitConfig, roomCode, tabId]);
+        // Initialize participant list
+        const initialParticipants = [
+          {
+            id: room.localParticipant.identity,
+            name,
+            isSpeaking: false,
+            isMuted: false,
+          },
+        ];
+        room.remoteParticipants.forEach((p) => {
+          initialParticipants.push({
+            id: p.identity,
+            name: p.name || "User",
+            isSpeaking: false,
+            isMuted: true,
+          });
+        });
+        setParticipants(initialParticipants);
 
+        // Request wake lock to prevent screen sleep
+        requestWakeLock();
+      } catch (err) {
+        console.error("Connection error:", err);
+        isReconnectingRef.current = false;
+        setError(err instanceof Error ? err.message : "Connection failed");
+        setConnectionState(ConnectionState.Disconnected);
+      }
+    },
+    [livekitConfig, roomCode, tabId],
+  );
+  
   /** Leave the meeting and return to home */
   const handleLeave = useCallback(() => {
     if (roomRef.current) {
@@ -651,36 +821,41 @@ export default function MeetingPage() {
       roomRef.current = null;
     }
     isReconnectingRef.current = false;
-    router.push('/');
+    router.push("/");
   }, [router]);
 
   /** Switch to a different room */
-  const handleRoomChange = useCallback((newRoom: string) => {
-    if (roomRef.current) {
-      roomRef.current.disconnect();
-      roomRef.current = null;
-    }
-    isReconnectingRef.current = false;
-    router.push(`/meeting/${newRoom}`);
-  }, [router]);
+  const handleRoomChange = useCallback(
+    (newRoom: string) => {
+      if (roomRef.current) {
+        roomRef.current.disconnect();
+        roomRef.current = null;
+      }
+      isReconnectingRef.current = false;
+      router.push(`/meeting/${newRoom}`);
+    },
+    [router],
+  );
 
   /** Toggle microphone on/off */
   const toggleMic = useCallback(async () => {
     const newMicState = !isMicOn;
     try {
       if (newMicState) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
         const track = stream.getAudioTracks()[0];
         await roomRef.current?.localParticipant?.publishTrack(track);
       } else {
         roomRef.current?.localParticipant?.trackPublications.forEach((pub) => {
-          if (pub.source === 'microphone' && pub.track) {
+          if (pub.source === "microphone" && pub.track) {
             roomRef.current?.localParticipant?.unpublishTrack(pub.track);
           }
         });
       }
     } catch (err) {
-      console.error('Mic error:', err);
+      console.error("Mic error:", err);
       return;
     }
 
@@ -691,25 +866,34 @@ export default function MeetingPage() {
   // Derived state
   // ============================================================
 
-  const isConnecting = connectionState === ConnectionState.Connecting || connectionState === ConnectionState.Reconnecting;
+  const isConnecting =
+    connectionState === ConnectionState.Connecting ||
+    connectionState === ConnectionState.Reconnecting;
   const isReconnecting = connectionState === ConnectionState.Reconnecting;
-  const roomDisplayName = ROOM_NAMES[roomCode] || roomCode.replace('-room', '');
+  const roomDisplayName = ROOM_NAMES[roomCode] || roomCode.replace("-room", "");
 
   // ============================================================
   // Render
   // ============================================================
 
-  if (!roomCode) return (
-    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center text-white p-4 text-center">Invalid room</div>
-  );
+  if (!roomCode)
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center text-white p-4 text-center">
+        Invalid room
+      </div>
+    );
 
-  if (!isJoined) return (
-    <NameEntry roomCode={roomCode} onSubmit={connect} isConfigLoading={isConfigLoading} />
-  );
+  if (!isJoined)
+    return (
+      <NameEntry
+        roomCode={roomCode}
+        onSubmit={connect}
+        isConfigLoading={isConfigLoading}
+      />
+    );
 
-  if (isConnecting) return (
-    <ConnectingOverlay isReconnecting={isReconnecting} />
-  );
+  if (isConnecting)
+    return <ConnectingOverlay isReconnecting={isReconnecting} />;
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] relative">
@@ -718,25 +902,39 @@ export default function MeetingPage() {
         <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-red-500/10 border border-red-500/20 px-4 py-2 rounded-xl z-50 flex items-center gap-2">
           <XCircle className="w-4 h-4 text-red-400" />
           <span className="text-red-400 text-sm">{error}</span>
-          <button onClick={() => setError(null)} className="text-gray-400 hover:text-white">✕</button>
+          <button
+            onClick={() => setError(null)}
+            className="text-gray-400 hover:text-white"
+          >
+            ✕
+          </button>
         </div>
       )}
 
       {/* Top bar with back button, room info, and participant count */}
       <div className="fixed top-3 left-3 right-3 flex items-center justify-between z-30">
         <div className="flex items-center gap-1.5 sm:gap-2">
-          <button onClick={handleLeave} className="p-2 hover:bg-[#1a1a1a] rounded-lg text-gray-400 hover:text-white transition-colors">
+          <button
+            onClick={handleLeave}
+            className="p-2 hover:bg-[#1a1a1a] rounded-lg text-gray-400 hover:text-white transition-colors"
+          >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 bg-[#1a1a1a] rounded-lg">
-            <Wifi className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${connectionState === ConnectionState.Connected ? 'text-green-500' : 'text-gray-500'}`} />
-            <span className="text-gray-400 text-xs sm:text-sm">{roomDisplayName}</span>
+            <Wifi
+              className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${connectionState === ConnectionState.Connected ? "text-green-500" : "text-gray-500"}`}
+            />
+            <span className="text-gray-400 text-xs sm:text-sm">
+              {roomDisplayName}
+            </span>
           </div>
         </div>
 
         <div className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 bg-[#1a1a1a] rounded-lg">
           <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500" />
-          <span className="text-gray-400 text-xs sm:text-sm">{participants.length}</span>
+          <span className="text-gray-400 text-xs sm:text-sm">
+            {participants.length}
+          </span>
         </div>
       </div>
 
