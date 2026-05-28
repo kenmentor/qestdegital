@@ -453,7 +453,7 @@ useEffect(()=>{
       </button>
       <button
         onClick={playMusic}
-        className={`px-3 sm:px-4 py-2 ${playingMusic ? "bg-transparent hover:bg-yellow-500/10  " : "text-yellow-400 bg-yellow-500/40 hover:bg-yellow-500/20 "} rounded-lg text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0`}
+        className={`px-3 sm:px-4 py-2 ${!playingMusic ? "bg-transparent hover:bg-yellow-500/10  " : "text-yellow-400 bg-yellow-500/40 hover:bg-yellow-500/20 "} rounded-lg text-xs sm:text-sm transition-colors whitespace-nowrap flex-shrink-0`}
       >
         <Music className="size-4" />
       </button>
