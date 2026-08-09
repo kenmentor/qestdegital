@@ -25,6 +25,19 @@ export default function Home() {
   const [roomCounts, setRoomCounts] = useState<RoomInfo>({ 'english-room': 0, 'french-room': 0, 'german-room': 0 });
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
+  const [roomPrefix, setRoomPrefix] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
+    if (id) {
+      setRoomPrefix(id);
+      localStorage.setItem("room_prefix", id);
+    } else {
+      const saved = localStorage.getItem("room_prefix");
+      if (saved) setRoomPrefix(saved);
+    }
+  }, []);
 
   useEffect(() => {
     if (selectedLang) {
@@ -32,10 +45,16 @@ export default function Home() {
     }
   }, [selectedLang]);
 
+  function roomCode(base: string) {
+    return roomPrefix ? `${base}-${roomPrefix}` : base;
+  }
+
   useEffect(() => {
     const fetchRoomCounts = async () => {
       try {
-        const response = await fetch('/api/rooms');
+        const prefix = roomPrefix || localStorage.getItem("room_prefix") || "";
+        const params = prefix ? `?prefix=${encodeURIComponent(prefix)}` : '';
+        const response = await fetch(`/api/rooms${params}`);
         if (response.ok) {
           const data = await response.json();
           setRoomCounts(data.counts || { 'english-room': 0, 'french-room': 0, 'german-room': 0 });
@@ -49,15 +68,14 @@ export default function Home() {
     fetchRoomCounts();
     const interval = setInterval(fetchRoomCounts, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [roomPrefix]);
 
   const handleJoin = () => {
     if (selectedLang) {
       setConnecting(true);
-      router.push(`/meeting/${selectedLang}`);
+      router.push(`/meeting/${roomCode(selectedLang)}`);
     }
   };
-  console.log("hello world for debuging ")
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center p-4 sm:p-6">
@@ -94,7 +112,7 @@ export default function Home() {
                   <>
                     <Users className="w-4 h-4" />
                     <span className={`text-sm ${selectedLang === lang.code ? 'text-black/70' : 'text-gray-400'}`}>
-                      {roomCounts[lang.code as keyof RoomInfo] || 0}
+                      {roomCounts[roomCode(lang.code) as keyof RoomInfo] || 0}
                     </span>
                   </>
                 )}
